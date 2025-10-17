@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rock, Paper, Scissors: Park Ranger Edition</title>
+    <style>
+        /* --- 70s National Parks Vibe CSS --- */
+        :root {
+            /* Earthy Tones */
+            --color-sandstone: #D9C7A3; /* Light, parchment background */
+            --color-forest: #334F32;    /* Deep moss green for headers/accents */
+            --color-rust: #A65F32;      /* Muted orange/rust for primary interactive elements */
+            --color-sky: #596570;       /* Muted blue/grey for text and borders */
+            --color-paper-white: #EFEBE0; /* Slightly lighter background for containers */
+
+            /* Typography */
+            --font-primary: 'Georgia', serif;
+        }
+
+        body {
+            font-family: var(--font-primary);
+            background-color: var(--color-sandstone);
+            color: var(--color-sky);
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-size: 3em;
+            color: var(--color-forest);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 0.5em;
+            text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.1);
+        }
+
+        h2, h3 {
+            color: var(--color-rust);
+            text-transform: uppercase;
+        }
+
+        /* Framed Poster Look for Containers */
+        #results, #score-card {
+            max-width: 400px;
+            width: 90%; /* Responsive width */
+            margin: 25px auto;
+            padding: 20px;
+            border: 5px solid var(--color-sky);
+            background-color: var(--color-paper-white);
+            border-radius: 5px;
+        }
+
+        #results p, #score-card p {
+            font-size: 1.2em;
+            margin: 5px 0;
+        }
+
+        /* Choice Buttons (Bold and Blocky) */
+        #choices button, #reset-btn {
+            background-color: var(--color-rust);
+            color: var(--color-sandstone);
+            border: none;
+            padding: 15px 30px;
+            margin: 10px;
+            font-size: 1.5em;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 4px 4px 0px var(--color-forest);
+            transition: all 0.1s ease-in-out;
+            border-radius: 5px;
+        }
+
+        #choices button:hover, #reset-btn:hover {
+            background-color: #C3794E;
+            box-shadow: 2px 2px 0px var(--color-forest);
+            transform: translateY(2px);
+        }
+
+        /* Feedback Display */
+        .result { 
+            font-size: 1.5em;
+        }
+        .result.win { color: var(--color-forest); }
+        .result.lose { color: var(--color-rust); }
+        .result.draw { color: var(--color-sky); }
+
+        /* Confetti Animation Styling */
+        .confetti-piece {
+            position: fixed; 
+            z-index: 1000;
+            border-radius: 2px;
+            opacity: 0;
+            animation: fall-and-fade 3s ease-in forwards;
+        }
+
+        @keyframes fall-and-fade {
+            0% {
+                opacity: 1;
+                transform: translateY(0) rotate(0deg);
+            }
+            100% {
+                /* Confetti falls way down off the screen */
+                transform: translateY(150vh) rotate(1080deg); 
+                opacity: 0;
+            }
+        }
+        
+        /* --- Shake Animation for Losing --- */
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        .shake {
+            animation: shake 0.3s ease-in-out; /* Quick, snappy shake */
+        }
+        
+        /* --- Idle Hand Animation --- */
+        #idle-hand {
+            font-size: 5em;
+            display: block;
+            margin: 20px auto 10px;
+            color: var(--color-rust); /* Use a bold, noticeable color */
+            filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.8; }
+        }
+
+        .idling {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        /* Utility class to hide the hand when playing/results are being processed */
+        .hidden {
+            visibility: hidden !important; /* CHANGED to visibility: hidden to prevent layout shift */
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Rock, Paper, Scissors</h1>
+
+    <!-- NEW WRAPPER FOR SHAKE EFFECT -->
+    <div id="game-area">
+        
+        <div id="choices">
+            <button data-choice="rock">Rock ✊</button>
+            <button data-choice="paper">Paper ✋</button>
+            <button data-choice="scissors">Scissors ✌️</button>
+        </div>
+
+        <!-- IDLE HAND ELEMENT MOVED HERE (BELOW CHOICES) -->
+        <!-- The content will be updated by JS to reflect the computer's last move -->
+        <span id="idle-hand" class="idling">✊</span>
+        
+        <div id="results">
+            <p>Your choice: <span id="user-choice-display"></span></p>
+            <p>Computer choice: <span id="computer-choice-display"></span></p>
+            <h2 id="result-display" class="result">Make your move!</h2>
+        </div>
+
+        <div id="score-card">
+            <h3>Score Card</h3>
+            <p>You: <span id="user-score">0</span> | Computer: <span id="computer-score">0</span></p>
+        </div>
+    </div>
+    <!-- END WRAPPER -->
+
+    <!-- NEW RESET BUTTON LOCATION -->
+    <button id="reset-btn">Reset Game</button>
+
+    <script>
+        // --- EMBEDDED JAVASCRIPT LOGIC ---
+
+        // --- 1. DOM Element References ---
+        const choiceButtons = document.querySelectorAll('#choices button');
+        const userChoiceDisplay = document.getElementById('user-choice-display');
+        const computerChoiceDisplay = document.getElementById('computer-choice-display');
+        const resultDisplay = document.getElementById('result-display');
+        const userScoreDisplay = document.getElementById('user-score');
+        const computerScoreDisplay = document.getElementById('computer-score');
+        const body = document.body;
+        const resetButton = document.getElementById('reset-btn');
+        const gameArea = document.getElementById('game-area');
+        const idleHand = document.getElementById('idle-hand'); 
+
+        // --- 2. State Tracking Variables & Constants ---
+        let userScore = 0;
+        let computerScore = 0;
+        const choices = ['rock', 'paper', 'scissors'];
+        const confettiColors = ['#D9C7A3', '#334F32', '#A65F32', '#596570']; 
+        
+        // NEW: Map choices to emojis
+        const choiceEmojis = {
+            'rock': '✊',
+            'paper': '✋',
+            'scissors': '✌️'
+        };
+
+
+        // --- 3. Game Functions ---
+
+        function generateComputerChoice() {
+            const randomNumber = Math.floor(Math.random() * choices.length);
+            return choices[randomNumber];
+        }
+
+        function getResult(userChoice, computerChoice) {
+            if (userChoice === computerChoice) {
+                return 'draw';
+            } else if (
+                (userChoice === 'rock' && computerChoice === 'scissors') ||
+                (userChoice === 'paper' && computerChoice === 'rock') ||
+                (userChoice === 'scissors' && computerChoice === 'paper')
+            ) {
+                return 'win';
+            } else {
+                return 'lose';
+            }
+        }
+
+        function launchConfetti() {
+            const confettiCount = 50; 
+            const duration = 3000;    
+            
+            for (let i = 0; i < confettiCount; i++) {
+                const piece = document.createElement('div');
+                piece.classList.add('confetti-piece');
+                
+                const randomColor = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+                piece.style.backgroundColor = randomColor;
+                
+                // Launch from center with a random spread
+                piece.style.left = `${50 + (Math.random() * 40 - 20)}vw`; 
+                piece.style.top = `-10px`;
+                
+                const size = `${Math.random() * 12 + 4}px`; 
+                piece.style.width = size;
+                piece.style.height = size;
+
+                // Staggered start delay
+                const randomDelay = `${Math.random() * 0.5}s`;
+                piece.style.animationDelay = randomDelay; 
+                
+                piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+
+                body.appendChild(piece);
+
+                setTimeout(() => {
+                    piece.remove();
+                }, duration);
+            }
+        }
+
+        function resetGame() {
+            userScore = 0;
+            computerScore = 0;
+            userScoreDisplay.textContent = userScore;
+            computerScoreDisplay.textContent = computerScore;
+            userChoiceDisplay.textContent = '';
+            computerChoiceDisplay.textContent = '';
+            
+            resultDisplay.textContent = 'Make your move!';
+            resultDisplay.className = 'result';
+            gameArea.classList.remove('shake');
+            
+            // NEW: Reset icon to Rock
+            idleHand.textContent = choiceEmojis['rock'];
+            idleHand.classList.remove('hidden');
+        }
+
+        function updateScoreAndDisplay(userChoice, computerChoice, result) {
+            let resultText = '';
+            
+            // Clear any previous shake animation before running the new round
+            gameArea.classList.remove('shake'); 
+
+            if (result === 'win') {
+                userScore++;
+                resultText = 'You Win! A point for you.';
+                launchConfetti();
+            } else if (result === 'lose') {
+                computerScore++;
+                resultText = 'You Lose! The computer takes the point.';
+                // Apply shake class on loss
+                gameArea.classList.add('shake');
+                setTimeout(() => {
+                    gameArea.classList.remove('shake');
+                }, 300); 
+            } else {
+                resultText = "It's a Draw! Go again.";
+            }
+
+            userChoiceDisplay.textContent = userChoice.toUpperCase();
+            computerChoiceDisplay.textContent = computerChoice.toUpperCase();
+            
+            userScoreDisplay.textContent = userScore;
+            computerScoreDisplay.textContent = computerScore;
+
+            resultDisplay.textContent = resultText;
+            resultDisplay.className = 'result ' + result;
+        }
+
+        function playGame(event) {
+            // Hide the idle hand immediately when a choice is made
+            idleHand.classList.add('hidden'); 
+
+            const userChoice = event.target.dataset.choice; 
+            const computerChoice = generateComputerChoice();
+            const result = getResult(userChoice, computerChoice);
+
+            updateScoreAndDisplay(userChoice, computerChoice, result);
+            
+            // Show the idle hand after a short delay to prompt the next move
+            setTimeout(() => {
+                // NEW: Update the hand icon to the computer's last choice
+                idleHand.textContent = choiceEmojis[computerChoice]; 
+                idleHand.classList.remove('hidden');
+            }, 300);
+        }
+
+        // --- 4. Event Listeners ---
+
+        choiceButtons.forEach(button => {
+            button.addEventListener('click', playGame);
+        });
+
+        resetButton.addEventListener('click', resetGame);
+        
+        // Initial setup to ensure the hand is visible when the page first loads
+        resetGame();
+    </script>
+</body>
+</html>
